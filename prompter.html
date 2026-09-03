@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<!-- スマホの画面サイズに最適化する設定 -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>スマホ専用プロンプター</title>
+<style>
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+    background-color: #000; /* プロ仕様の黒背景 */
+    color: #fff; /* 白文字 */
+  }
+  #setup-screen {
+    padding: 20px;
+  }
+  h2 {
+    color: #fff;
+    text-align: center;
+  }
+  textarea {
+    width: 100%;
+    height: 300px;
+    font-size: 16px;
+    padding: 15px;
+    box-sizing: border-box;
+    border-radius: 8px;
+    background-color: #222;
+    color: #fff;
+    border: 1px solid #444;
+  }
+  .btn-start {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 15px;
+    font-size: 18px;
+    font-weight: bold;
+    border-radius: 8px;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 20px;
+  }
+  #prompter-screen {
+    display: none;
+    height: 100vh;
+    overflow: hidden;
+    position: relative;
+    background-color: #000;
+  }
+  /* 視線が左右に動かないよう、横幅を少し絞る */
+  #prompter-text {
+    position: absolute;
+    width: 90%;
+    left: 5%;
+    top: 100%; /* 初期位置は画面の一番下 */
+    font-size: 40px;
+    line-height: 1.8;
+    font-weight: bold;
+    text-align: center;
+    white-space: pre-wrap;
+  }
+  /* 操作ボタン（画面下部に固定） */
+  #controls {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(30, 30, 30, 0.9);
+    padding: 10px;
+    border-radius: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    width: 95%;
+    z-index: 100;
+  }
+  .ctrl-btn {
+    background-color: #444;
+    color: white;
+    border: none;
+    padding: 12px 15px;
+    font-size: 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    flex-grow: 1;
+  }
+  .ctrl-btn.play {
+    background-color: #28a745;
+    font-weight: bold;
+  }
+  .ctrl-btn.close {
+    background-color: #dc3545;
+  }
+</style>
+</head>
+<body>
+
+<!-- 入力画面 -->
+<div id="setup-screen">
+  <h2>原稿を入力</h2>
+  <textarea id="script-input" placeholder="ここに原稿を貼り付けてください..."></textarea>
+  <button class="btn-start" onclick="startPrompter()">プロンプターを開始</button>
+</div>
+
+<!-- プロンプター画面 -->
+<div id="prompter-screen">
+  <div id="prompter-text"></div>
+  
+  <div id="controls">
+    <button class="ctrl-btn" onclick="changeSize(5)">文字 ＋</button>
+    <button class="ctrl-btn" onclick="changeSize(-5)">文字 −</button>
+    <button class="ctrl-btn" onclick="changeSpeed(-0.5)">遅く</button>
+    <button class="ctrl-btn" onclick="changeSpeed(0.5)">速く</button>
+    <button class="ctrl-btn play" id="play-btn" onclick="togglePlay()">▶ 再生</button>
+    <button class="ctrl-btn close" onclick="exitPrompter()">終了</button>
+  </div>
+</div>
+
+<script>
+  let isPlaying = false;
+  let speed = 1.5; // 初期のスクロール速度
+  let position = 0;
+  let animationId;
+  let fontSize = 45; // 初期の文字サイズ
+
+  const prompterText = document.getElementById('prompter-text');
+  const prompterScreen = document.getElementById('prompter-screen');
+  const setupScreen = document.getElementById('setup-screen');
+  const playBtn = document.getElementById('play-btn');
+
+  function startPrompter() {
+    const text = document.getElementById('script-input').value;
+    if (!text) {
+      alert("原稿を入力してください。");
+      return;
+    }
+    
+    prompterText.innerText = text;
+    prompterText.style.fontSize = fontSize + 'px';
+    
+    setupScreen.style.display = 'none';
+    prompterScreen.style.display = 'block';
+    
+    // スクロールの初期位置を画面の下端にセット
+    position = window.innerHeight;
+    prompterText.style.top = position + 'px';
+    
+    isPlaying = false;
+    playBtn.innerText = '▶ 再生';
+    playBtn.style.backgroundColor = '#28a745';
+  }
+
+  function togglePlay() {
+    isPlaying = !isPlaying;
+    if (isPlaying) {
+      playBtn.innerText = '⏸ 停止';
+      playBtn.style.backgroundColor = '#ffc107';
+      scrollText();
+    } else {
+      playBtn.innerText = '▶ 再生';
+      playBtn.style.backgroundColor = '#28a745';
+      cancelAnimationFrame(animationId);
+    }
+  }
+
+  function scrollText() {
+    position -= speed;
+    prompterText.style.top = position + 'px';
+    
+    // 文章が一番上まで消えたら停止して最初に戻す
+    if (position < -prompterText.clientHeight) {
+      isPlaying = false;
+      playBtn.innerText = '▶ 再生';
+      playBtn.style.backgroundColor = '#28a745';
+      position = window.innerHeight;
+      prompterText.style.top = position + 'px';
+      return;
+    }
+    
+    if (isPlaying) {
+      animationId = requestAnimationFrame(scrollText);
+    }
+  }
+
+  function changeSpeed(delta) {
+    speed += delta;
+    if (speed < 0.5) speed = 0.5; // 遅さの限界
+  }
+
+  function changeSize(delta) {
+    fontSize += delta;
+    if (fontSize < 20) fontSize = 20; // 小ささの限界
+    prompterText.style.fontSize = fontSize + 'px';
+  }
+
+  function exitPrompter() {
+    isPlaying = false;
+    cancelAnimationFrame(animationId);
+    prompterScreen.style.display = 'none';
+    setupScreen.style.display = 'block';
+  }
+</script>
+
+</body>
+</html>
